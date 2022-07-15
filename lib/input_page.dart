@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:camera/camera.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'main.dart';
 import 'nav_bar.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 class InputPage extends StatefulWidget {
   const InputPage({Key? key, required this.title}) : super(key: key);
@@ -16,6 +21,44 @@ class InputPage extends StatefulWidget {
 class InputPageState extends State<InputPage> {
   double value1 = 0;
   double value2 = 0;
+  final List<StreamSubscription<dynamic>> _streamSubscriptions =
+      <StreamSubscription<dynamic>>[];
+
+  @override
+  void initState() {
+    if (Platform.isAndroid) {
+      super.initState();
+      _streamSubscriptions.add(gyroscopeEvents.listen((event) {
+        if (kDebugMode) {
+          print(event);
+        }
+        value1 = event.x * 10;
+        value2 = event.y * 10;
+
+        if (value1 > 100) {
+          value1 = 100;
+        }
+        if (value1 < -100) {
+          value1 = -100;
+        }
+        if (value2 > 100) {
+          value2 = 100;
+        }
+        if (value2 < -100) {
+          value2 = -100;
+        }
+        setState(() {});
+      }));
+    }
+  }
+
+  @override
+  void dispose() {
+    for (StreamSubscription<dynamic> subscription in _streamSubscriptions) {
+      subscription.cancel();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +75,7 @@ class InputPageState extends State<InputPage> {
             NavList(),
             Expanded(
                 flex: 1,
-                child: Column(
+                child: ListView(
                   children: [
                     Row(
                       children: [
@@ -48,7 +91,7 @@ class InputPageState extends State<InputPage> {
                                   });
                                 })),
                         Padding(
-                            padding: EdgeInsets.all(10.0),
+                            padding: const EdgeInsets.all(10.0),
                             child: Text(value1.toStringAsFixed(2))),
                       ],
                     ),
@@ -66,11 +109,15 @@ class InputPageState extends State<InputPage> {
                                   });
                                 })),
                         Padding(
-                            padding: EdgeInsets.all(10.0),
+                            padding: const EdgeInsets.all(10.0),
                             child: Text(value2.toStringAsFixed(2))),
                       ],
                     ),
-                    FileUpload(),
+                    (kIsWeb)
+                        ? const FileUpload()
+                        : (Platform.isAndroid)
+                            ? const CameraModule()
+                            : Container(),
                   ],
                 ))
           ])),
@@ -91,6 +138,7 @@ class FileUploadState extends State<FileUpload> {
 
   @override
   Widget build(BuildContext context) {
+    //ja ir web platforma
     return Column(children: [
       ListTile(
         title: Text(virsraksts),
@@ -101,7 +149,7 @@ class FileUploadState extends State<FileUpload> {
           ))
               ?.files
               .first
-              .bytes as Uint8List;
+              .bytes;
           setState(() {
             attels = file;
           });
@@ -115,6 +163,71 @@ class FileUploadState extends State<FileUpload> {
           : Container(
               width: 0,
             )
+    ]);
+  }
+}
+
+class CameraModule extends StatefulWidget {
+  const CameraModule({Key? key}) : super(key: key);
+
+  @override
+  CameraModuleState createState() => CameraModuleState();
+}
+
+class CameraModuleState extends State<CameraModule> {
+  late CameraController _controller;
+  late Future<void> _initializeControllerFuture;
+  final CameraDescription mainCamera = cameras.first;
+  String? attels;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = CameraController(
+      mainCamera,
+      ResolutionPreset.medium,
+    );
+
+    _initializeControllerFuture = _controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      TextButton(
+          onPressed: () async {
+            try {
+              await _initializeControllerFuture;
+
+              final result = await _controller.takePicture();
+              setState(() {
+                attels = result.path;
+              });
+            } catch (e) {
+              if (kDebugMode) {
+                print(e);
+              }
+            }
+          },
+          child: const Text("Uzņemt attēlu")),
+      FutureBuilder<void>(
+        future: _initializeControllerFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            return CameraPreview(_controller);
+          } else {
+            return const Center(child: CircularProgressIndicator());
+          }
+        },
+      ),
+      (attels != null) ? Image.file(File(attels as String)) : Container()
     ]);
   }
 }
