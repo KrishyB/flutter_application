@@ -26,30 +26,32 @@ class InputPageState extends State<InputPage> {
 
   @override
   void initState() {
-    if (Platform.isAndroid) {
-      super.initState();
-      _streamSubscriptions.add(gyroscopeEvents.listen((event) {
-        if (kDebugMode) {
-          print(event);
-        }
-        value1 = event.x * 10;
-        value2 = event.y * 10;
+    if (!kIsWeb) {
+      if (Platform.isAndroid) {
+        _streamSubscriptions.add(gyroscopeEvents.listen((event) {
+          if (kDebugMode) {
+            print(event);
+          }
+          value1 = event.x * 10;
+          value2 = event.y * 10;
 
-        if (value1 > 100) {
-          value1 = 100;
-        }
-        if (value1 < -100) {
-          value1 = -100;
-        }
-        if (value2 > 100) {
-          value2 = 100;
-        }
-        if (value2 < -100) {
-          value2 = -100;
-        }
-        setState(() {});
-      }));
+          if (value1 > 100) {
+            value1 = 100;
+          }
+          if (value1 < -100) {
+            value1 = -100;
+          }
+          if (value2 > 100) {
+            value2 = 100;
+          }
+          if (value2 < -100) {
+            value2 = -100;
+          }
+          setState(() {});
+        }));
+      }
     }
+    super.initState();
   }
 
   @override
